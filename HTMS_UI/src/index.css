@@ -1,0 +1,64 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Serif+Display:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* --- 1. ĐỊNH NGHĨA MÀU SẮC TẠI ĐÂY --- */
+@layer base {
+  :root {
+    /* Màu nền Pastel Xanh cho Light Mode */
+    --background: #f0fdfa; 
+    /* Màu chữ chính (Xanh cực đậm) */
+    --foreground: #042f2e;
+    /* Màu thanh cuộn */
+    --scrollbar: #ccfbf1;
+  }
+
+  .dark {
+    /* Màu nền cho Dark Mode */
+    --background: #020617; 
+    /* Màu chữ cho Dark Mode */
+    --foreground: #f8fafc;
+    /* Màu thanh cuộn Dark Mode */
+    --scrollbar: #1e293b;
+  }
+}
+
+/* --- 2. ÁP DỤNG CHO TOÀN WEB --- */
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  
+  /* Đổi màu nền và chữ dựa trên biến đã khai báo ở trên */
+  background-color: var(--background);
+  color: var(--foreground);
+  
+  font-family: "Be Vietnam Pro", ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  
+  /* Thêm hiệu ứng chuyển màu mượt mà khi đổi Dark/Light mode */
+  transition: background-color 0.4s ease, color 0.4s ease;
+}
+
+/* --- 3. TÙY CHỈNH THANH CUỘN (Dùng biến để tự đổi theo mode) --- */
+::-webkit-scrollbar       { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { 
+  background: var(--scrollbar); 
+  border-radius: 9999px; 
+}
+::-webkit-scrollbar-thumb:hover { background: #0d9488; }
+
+/* --- 4. HIỆU ỨNG ANIMATION (Giữ nguyên) --- */
+@keyframes orbFloat {
+  0%, 100% { transform: translate(0, 0); }
+  50%      { transform: translate(20px, -20px); }
+}
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
