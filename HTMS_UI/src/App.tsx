@@ -16,6 +16,7 @@ import StatsPage       from "@/pages/stats/StatsPage";
 import SettingsPage from "./pages/settings/SettingsPage";
 import StoragePage from "./components/project/StoragePage";
 import { R } from "node_modules/@tanstack/react-query-devtools/build/modern/ReactQueryDevtools-ChNsB-ya";
+import HomePage from "./pages/Home/HomePage";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 1000 * 60 * 5 } },
@@ -23,7 +24,7 @@ const queryClient = new QueryClient({
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  return isAuthenticated ? <>{children}</> : <Navigate to="/auth" replace />;
+  return isAuthenticated ? <>{children}</> : <Navigate to="/home" replace />;
 }
 
 function PlaceholderPage({ title }: { title: string }) {
@@ -49,6 +50,7 @@ export default function App() {
       <BrowserRouter>
         <SignalRProvider />
         <Routes>
+          <Route path="/home" element={<HomePage />} />
           <Route path="/auth" element={<AuthPage />} />
           <Route
             path="/"

@@ -254,7 +254,7 @@ export default function ProjectSettingsModal({
                         value={deleteInput}
                         onChange={e => setDeleteInput(e.target.value)}
                         placeholder={projectName}
-                        className={cn("w-full px-3.5 py-2.5 rounded-xl text-sm #f0fdfadark:bg-white/[0.04] border text-slate-800 dark:text-slate-100 placeholder:text-slate-300 focus:outline-none transition-all",
+                        className={cn("w-full px-3.5 py-2.5 rounded-xl text-sm #f0fdfa dark:bg-white/[0.1] border text-slate-800 dark:text-slate-100 placeholder:text-slate-300 focus:outline-none transition-all",
                           canDelete
                             ? "border-rose-400 focus:ring-2 focus:ring-rose-400/20"
                             : "border-slate-200 dark:border-white/[0.08] focus:border-rose-400")}

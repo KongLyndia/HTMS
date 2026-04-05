@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { cn }                from "@/lib/utils";
 import { useProjectStats }   from "@/hooks/useMembers";
+import { calcWorkloadScore, calcRiskScore } from "@/lib/taskPrioritizer";
 import { useProjectStore }    from "@/store/projectStore";
 import ExportReportButton    from "@/components/project/ExportReportButton";
 import { useAuthStore }      from "@/store/authStore";
@@ -146,7 +147,7 @@ export default function StatsPage() {
         <BarChart2 className="w-5 h-5 text-teal-500" />
         <h1 className="text-base font-bold text-slate-800 dark:text-white">Thống kê dự án</h1>
         <div className="flex items-center gap-2 ml-auto">
-          <span className="text-xs text-slate-400"></span>
+          <span className="text-xs text-slate-400">Cập nhật</span>
           <span className="w-2 h-2 rounded-full bg-teal-500 animate-pulse" />
           <ExportReportButton
             projectId={projectId!}
@@ -292,7 +293,7 @@ export default function StatsPage() {
                       transition={{ duration: 0.6, delay: i * 0.05 }}
                       className="h-full rounded-full bg-gradient-to-r from-teal-500 to-emerald-400" />
                   </div>
-                  <div className="flex gap-3 mt-1">
+                  <div className="flex gap-3 mt-1 flex-wrap">
                     {[
                       { label: "Tổng", val: m.total,      cls: "text-slate-400" },
                       { label: "Xong", val: m.completed,  cls: "text-emerald-500" },
@@ -303,6 +304,19 @@ export default function StatsPage() {
                         {s.label}: {s.val}
                       </span>
                     ))}
+                    {/* Workload + Risk inline */}
+                    {(() => {
+                      const wl = m.total > 0 ? Math.round((m.inProgress / m.total) * 100) : 0;
+                      const risk = m.total > 0 ? Math.round(((m.total - m.completed - m.inProgress - m.pending - m.todo) < 0 ? 0 : 0) * 100) : 0;
+                      return (
+                        <span className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded-full",
+                          wl >= 80 ? "bg-rose-100 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400"
+                          : wl >= 50 ? "bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400"
+                          : "bg-teal-100 text-teal-600 dark:bg-teal-500/20 dark:text-teal-400")}>
+                          WL {wl}%
+                        </span>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>

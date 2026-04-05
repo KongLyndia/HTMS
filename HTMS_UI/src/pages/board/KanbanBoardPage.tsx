@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import WorkloadPanel from "@/components/board/WorkloadPanel";
 import {
   Plus, Calendar, Flag, AlertCircle, Loader2, X,
   Crown, Shield, Eye, MoreHorizontal, Trash2, Pencil,
@@ -37,21 +38,59 @@ function resolveFileUrl(url: string): string {
 // Đuôi file browser không preview được → mở qua Google Docs Viewer
 const DOCS_VIEWER_EXTS = [".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx"];
 
-function openFile(fileUrl: string, fileName: string) {
-  const resolved = resolveFileUrl(fileUrl);
-  const ext = "." + (fileName.split(".").pop()?.toLowerCase() ?? "");
-  if (DOCS_VIEWER_EXTS.includes(ext)) {
-    window.open(
-      `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(resolved)}`,
-      "_blank", "noopener,noreferrer"
-    );
-  } else {
-    // PDF + các loại khác → mở thẳng URL Cloudinary trên tab mới
-    // Browser tự render PDF natively, không cần viewer bên thứ 3
-    window.open(resolved, "_blank", "noopener,noreferrer");
-  }
+
+// ─── Download & PDF helpers ───────────────────────────────────────────
+// ─── Download & PDF helpers ───────────────────────────────────────────
+
+// Chuẩn hóa URL: loại bỏ fl_attachment nếu có (để xem)
+function getViewUrl(url: string): string {
+  if (!url.includes("cloudinary.com")) return url;
+  return url.replace("/fl_attachment/", "/");
 }
 
+// Thêm fl_attachment để buộc tải về (thay vì xem)
+function forceDownloadUrl(url: string): string {
+  if (!url.includes("cloudinary.com")) return url;
+  
+  // Nếu đã có rồi thì không thêm nữa
+  if (url.includes("fl_attachment")) return url;
+  
+  // Xử lý cả 3 dạng URL: /upload/, /image/upload/, /raw/upload/
+  if (url.includes("/image/upload/")) {
+    return url.replace("/image/upload/", "/image/upload/fl_attachment/");
+  }
+  if (url.includes("/raw/upload/")) {
+    return url.replace("/raw/upload/", "/raw/upload/fl_attachment/");
+  }
+  // Fallback cho dạng /upload/ thông thường
+  return url.replace("/upload/", "/upload/fl_attachment/");
+}
+
+// Mở file để xem (không tải về)
+function openFile(fileUrl: string, fileName: string) {
+  // Lấy URL đã loại bỏ fl_attachment để xem được
+  const viewUrl = getViewUrl(fileUrl);
+  const ext = "." + (fileName.split(".").pop()?.toLowerCase() ?? "");
+  
+  // File Office → Microsoft Viewer
+  if (DOCS_VIEWER_EXTS.includes(ext)) {
+    window.open(
+      `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(viewUrl)}`,
+      "_blank", "noopener,noreferrer"
+    );
+  } 
+  // File PDF → dùng Google Viewer (nhanh hơn pdf.js)
+  else if (ext === ".pdf") {
+    window.open(
+      `https://docs.google.com/viewer?url=${encodeURIComponent(viewUrl)}&embedded=true`,
+      "_blank", "noopener,noreferrer"
+    );
+  } 
+  // Ảnh, video, file khác → mở trực tiếp
+  else {
+    window.open(viewUrl, "_blank", "noopener,noreferrer");
+  }
+}
 const COL_DOTS = COLUMN_DOT_COLORS;
 
 // ════════════════════════════════════════════════════════════════════
@@ -400,7 +439,7 @@ function TaskDetailModal({ task, board, projectId, onClose }: {
               <div className="space-y-1">
                 <label className="text-[10px] text-slate-400 uppercase tracking-wide">Giao cho</label>
                 <select value={editAssignee} onChange={e => setEditAssignee(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-lg bg-slate-50 dark:bg-white/[0.05] border border-slate-200 dark:border-white/[0.08] text-slate-700 dark:text-slate-300 focus:outline-none focus:border-teal-400">
+                  className="w-full px-3 py-2 text-xs rounded-lg bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-white/[0.08] text-slate-700 dark:text-slate-300 focus:outline-none focus:border-teal-400">
                   <option value="">Chưa giao</option>
                   {board.members.filter(m => m.role !== "Viewer").map(m =>
                     <option key={m.userId} value={m.userId}>{m.fullName} ({m.role})</option>
@@ -411,7 +450,7 @@ function TaskDetailModal({ task, board, projectId, onClose }: {
               <div className="space-y-1">
                 <label className="text-[10px] text-slate-400 uppercase tracking-wide">Ưu tiên</label>
                 <select value={editPriority} onChange={e => setEditPriority(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-lg bg-slate-50 dark:bg-white/[0.05] border border-slate-200 dark:border-white/[0.08] text-slate-700 dark:text-slate-300 focus:outline-none focus:border-teal-400">
+                  className="w-full px-3 py-2 text-xs rounded-lg bg-slate-100 dark:bg-white/[0.1] border border-slate-200 dark:border-white/[0.1] text-slate-700 dark:text-slate-300 focus:outline-none focus:border-teal-400">
                   <option value="">Không</option>
                   <option value="Low">Thấp</option>
                   <option value="Medium">Trung bình</option>
@@ -483,7 +522,7 @@ function TaskDetailModal({ task, board, projectId, onClose }: {
                   : <span className="text-xs text-slate-400">Chưa đặt</span>}
               </div>
               {prio && (
-                <div className="p-3 rounded-xl bg-slate-50 dark:bg-white/[0.03] border border-slate-100 dark:border-white/[0.06]">
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-white/[0.1] border border-slate-100 dark:border-white/[0.06]">
                   <p className="text-[10px] text-slate-400 uppercase tracking-wide mb-1">Ưu tiên</p>
                   <span className={cn("text-xs font-semibold px-2 py-0.5 rounded-full", prio.bg, prio.text)}>{prio.label}</span>
                 </div>
@@ -1026,11 +1065,12 @@ function TaskCard({ task, board, projectId}: {
 function AddTaskForm({ projectId, board, onClose }: {
   projectId: string; board: BoardData; onClose: () => void;
 }) {
-  const [title,    setTitle]    = useState("");
-  const [desc,     setDesc]     = useState("");
-  const [dueDate,  setDueDate]  = useState("");
-  const [priority, setPriority] = useState("");
-  const [assignee, setAssignee] = useState("");
+  const [title,        setTitle]        = useState("");
+  const [desc,         setDesc]         = useState("");
+  const [dueDate,      setDueDate]      = useState("");
+  const [priority,     setPriority]     = useState("");
+  const [assignee,     setAssignee]     = useState("");
+  const [showWorkload, setShowWorkload] = useState(false);
   const createTask = useCreateTask(projectId);
 
   const submit = () => {
@@ -1068,7 +1108,7 @@ function AddTaskForm({ projectId, board, onClose }: {
           <div className="relative">
             <Flag className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
             <select value={priority} onChange={e => setPriority(e.target.value)}
-              className="appearance-none pl-7 pr-6 py-1.5 text-xs rounded-lg bg-slate-50 dark:bg-white/[0.05] border border-slate-200 dark:border-white/[0.08] text-slate-700 dark:text-slate-300 focus:outline-none focus:border-teal-400 cursor-pointer">
+              className="appearance-none pl-7 pr-6 py-1.5 text-xs rounded-lg bg-slate-50 dark:bg-[#1a2e48] border border-slate-200 dark:border-white/[0.08] text-slate-700 dark:text-slate-200 focus:outline-none focus:border-teal-400 cursor-pointer [color-scheme:light] dark:[color-scheme:dark]">
               <option value="">Ưu tiên</option>
               <option value="Low">Thấp</option>
               <option value="Medium">Trung bình</option>
@@ -1080,12 +1120,33 @@ function AddTaskForm({ projectId, board, onClose }: {
         </div>
         <div className="relative">
           <select value={assignee} onChange={e => setAssignee(e.target.value)}
-            className="w-full appearance-none px-3 pr-7 py-1.5 text-xs rounded-lg bg-slate-50 dark:bg-white/[0.05] border border-slate-200 dark:border-white/[0.08] text-slate-700 dark:text-slate-300 focus:outline-none focus:border-teal-400 cursor-pointer">
+            className="w-full appearance-none px-3 pr-7 py-1.5 text-xs rounded-lg bg-slate-50 dark:bg-[#1a2e48] border border-slate-200 dark:border-white/[0.08] text-slate-700 dark:text-slate-200 focus:outline-none focus:border-teal-400 cursor-pointer [color-scheme:light] dark:[color-scheme:dark]">
             <option value="">Chưa giao cho ai</option>
             {board.members.filter(m => m.role !== "Viewer").map(m => <option key={m.userId} value={m.userId}>{m.fullName}</option>)}
           </select>
           <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
         </div>
+
+        {/* Workload Balancer toggle */}
+        <button type="button"
+          onClick={() => setShowWorkload(v => !v)}
+          className="flex items-center gap-1.5 text-[11px] font-semibold text-teal-600 dark:text-teal-400
+                     hover:text-teal-700 dark:hover:text-teal-300 transition-colors">
+          <span className="text-[10px]"></span>
+          {showWorkload ? "Ẩn gợi ý " : "Gợi ý phân công "}
+        </button>
+
+        {/* Workload Panel */}
+        <AnimatePresence>
+          {showWorkload && (
+            <WorkloadPanel
+              board={board}
+              selectedUserId={assignee}
+              onSelectUser={setAssignee}
+            />
+          )}
+        </AnimatePresence>
+
         <div className="flex gap-2 pt-0.5">
           <button onClick={submit} disabled={!title.trim() || createTask.isPending}
             className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-teal-500 hover:bg-teal-600 text-white text-xs font-semibold disabled:opacity-50 transition-colors">

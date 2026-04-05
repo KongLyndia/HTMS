@@ -8,6 +8,7 @@ import {
   Loader2, AlertCircle, FileText, FileImage,
   FileSpreadsheet, Film, Archive, File,
   X, Filter, CheckCircle2,
+  ExternalLink,
 } from "lucide-react";
 import { cn }              from "@/lib/utils";
 import { storageApi, type ProjectFileItem } from "@/api/storageApi";
@@ -47,6 +48,25 @@ function formatSize(bytes: number) {
   return `${(bytes / 1024 ** 3).toFixed(2)} GB`;
 }
 
+// Buộc download — xử lý cả image/upload và raw/upload
+function forceDownloadUrl(url: string): string {
+  if (!url.includes("cloudinary.com")) return url;
+  if (url.includes("fl_attachment")) return url; // đã có rồi
+  // image/upload → image/upload/fl_attachment
+  if (url.includes("/image/upload/"))
+    return url.replace("/image/upload/", "/image/upload/fl_attachment/");
+  // raw/upload → raw/upload/fl_attachment
+  if (url.includes("/raw/upload/"))
+    return url.replace("/raw/upload/", "/raw/upload/fl_attachment/");
+  return url.replace("/upload/", "/upload/fl_attachment/");
+}
+
+// Lấy URL xem trực tiếp — chỉ ảnh và video mới xem được inline
+function getViewUrl(url: string): string {
+  // Xóa fl_attachment nếu có để mở xem
+  return url.replace("/fl_attachment/", "/");
+}
+
 function openFile(url: string, name: string) {
   const ext = "." + name.split(".").pop()?.toLowerCase();
   if (DOCS_EXTS.includes(ext)) {
@@ -80,32 +100,48 @@ function Toast({ msg, type }: { msg: string; type: "success"|"error" }) {
   );
 }
 
-// ─── Preview Modal ────────────────────────────────────────────────────
+// ─── Preview Modal (ĐÃ SỬA: dùng Google PDF Viewer + forceDownloadUrl cho nút tải) ──────────────────
 function PreviewModal({ file, onClose }: { file: ProjectFileItem; onClose: () => void }) {
-  const isImage       = file.fileType === "image";
-  const isPDF         = file.fileType === "pdf";
-  const isDoc   = DOCS_EXTS.includes("." + (file.fileName.split(".").pop() ?? "").toLowerCase());
-  const [iframeReady, setIframeReady] = useState(false);
-  const [iframeKey,   setIframeKey]   = useState(0); // reset iframe nếu cần
+  const isImage = file.fileType === "image";
+  const isPDF = file.fileType === "pdf";
+  const isDoc = DOCS_EXTS.includes("." + (file.fileName.split(".").pop()?.toLowerCase() ?? ""));
+
+  // Tạo URL an toàn để nhúng PDF qua Google Docs Viewer
+  const pdfViewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(file.fileUrl)}&embedded=true`;
 
   return (
-    <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
-      onClick={onClose}>
-      <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.96 }} transition={{ duration: 0.15 }}
-        onClick={e => e.stopPropagation()}
-        className="relative w-full max-w-3xl max-h-[85vh] rounded-2xl bg-white dark:bg-[#131f35] border border-slate-200 dark:border-white/[0.08] shadow-2xl overflow-hidden flex flex-col">
-
+    <div
+      className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.96 }}
+        transition={{ duration: 0.15 }}
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-w-4xl max-h-[90vh] rounded-2xl bg-white dark:bg-[#131f35] border border-slate-200 dark:border-white/[0.08] shadow-2xl overflow-hidden flex flex-col"
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-white/[0.06] flex-shrink-0">
-          <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 truncate">{file.fileName}</p>
+          <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 truncate">
+            {file.fileName}
+          </p>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <a href={file.fileUrl} download={file.fileName} target="_blank" rel="noreferrer"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-teal-500 hover:bg-teal-600 text-white transition-colors">
+            {/* ĐÃ SỬA: dùng forceDownloadUrl cho nút tải */}
+            <a
+              href={forceDownloadUrl(file.fileUrl)}
+              download={file.fileName}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-teal-500 hover:bg-teal-600 text-white transition-colors"
+            >
               <Download className="w-3.5 h-3.5" /> Tải xuống
             </a>
-            <button onClick={onClose}
-              className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors">
+            <button
+              onClick={onClose}
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
+            >
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -113,59 +149,51 @@ function PreviewModal({ file, onClose }: { file: ProjectFileItem; onClose: () =>
 
         {/* Content */}
         <div className="flex-1 overflow-auto flex items-center justify-center bg-slate-50 dark:bg-[#0d1525] p-4">
+          {/* Ảnh */}
           {isImage && (
-            <img src={file.fileUrl} alt={file.fileName}
-              className="max-w-full max-h-full rounded-xl object-contain" />
+            <img
+              src={file.fileUrl}
+              alt={file.fileName}
+              className="max-w-full max-h-full rounded-xl object-contain"
+            />
           )}
+
+          {/* PDF – DÙNG GOOGLE PDF VIEWER (không bị lỗi CORS) */}
           {isPDF && (
-            <div className="relative w-full h-[60vh]">
-              {/* Loading skeleton */}
-              {!iframeReady && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-slate-100 dark:bg-[#0d1525] rounded-xl">
-                  <Loader2 className="w-8 h-8 text-teal-500 animate-spin" />
-                  <p className="text-xs text-slate-400">Đang tải PDF...</p>
-                  <button
-                    onClick={() => window.open(file.fileUrl, "_blank", "noopener,noreferrer")}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-teal-500 hover:bg-teal-600 text-white transition-colors mt-1">
-                    <Download className="w-3.5 h-3.5" /> Mở trực tiếp
-                  </button>
-                </div>
-              )}
-              <iframe
-                key={iframeKey}
-                src={`https://docs.google.com/viewer?url=${encodeURIComponent(file.fileUrl)}&embedded=true`}
-                title={file.fileName}
-                onLoad={() => setIframeReady(true)}
-                className={cn(
-                  "w-full h-full rounded-xl border-0 bg-white transition-opacity duration-300",
-                  iframeReady ? "opacity-100" : "opacity-0"
-                )}
-              />
-              {/* Nút reload nếu iframe trắng sau 8 giây */}
-              {iframeReady && (
-                <button
-                  onClick={() => { setIframeReady(false); setIframeKey(k => k + 1); }}
-                  className="absolute top-2 right-2 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-white/80 dark:bg-slate-800/80 text-slate-500 hover:text-teal-600 border border-slate-200 dark:border-white/10 backdrop-blur-sm transition-colors">
-                  Tải lại
-                </button>
-              )}
-            </div>
+            <iframe
+              src={pdfViewerUrl}
+              title={file.fileName}
+              className="w-full h-[70vh] rounded-xl border-0 bg-white"
+              style={{ minHeight: "500px" }}
+            />
           )}
+
+          {/* Office documents (Word, Excel, PPT) */}
           {isDoc && (
             <iframe
               src={`https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(file.fileUrl)}`}
               title={file.fileName}
-              className="w-full h-[60vh] rounded-xl border-0" />
+              className="w-full h-[70vh] rounded-xl border-0"
+            />
           )}
+
+          {/* Fallback cho loại file khác */}
           {!isImage && !isPDF && !isDoc && (
             <div className="flex flex-col items-center gap-4 py-12">
               <div className="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-white/10 flex items-center justify-center">
                 <File className="w-8 h-8 text-slate-400" />
               </div>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Không thể xem trước loại file này</p>
-              <a href={file.fileUrl} target="_blank" rel="noreferrer"
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-teal-500 hover:bg-teal-600 text-white text-sm font-semibold transition-colors">
-                <Download className="w-4 h-4" /> Mở file
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">
+                Không thể xem trước loại file này
+              </p>
+              <a
+                href={forceDownloadUrl(file.fileUrl)}
+                download={file.fileName}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-teal-500 hover:bg-teal-600 text-white text-sm font-semibold transition-colors"
+              >
+                <Download className="w-4 h-4" /> Tải xuống
               </a>
             </div>
           )}
@@ -175,7 +203,7 @@ function PreviewModal({ file, onClose }: { file: ProjectFileItem; onClose: () =>
   );
 }
 
-// ─── File Card ────────────────────────────────────────────────────────
+// ─── File Card (ĐÃ SỬA: dùng forceDownloadUrl cho nút tải) ────────────────────────────────────────
 function FileCard({ file, onPreview, onDelete }: {
   file:      ProjectFileItem;
   onPreview: (f: ProjectFileItem) => void;
@@ -227,7 +255,8 @@ function FileCard({ file, onPreview, onDelete }: {
           {/* Actions */}
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
             onClick={e => e.stopPropagation()}>
-            <a href={file.fileUrl} download={file.fileName} target="_blank" rel="noreferrer"
+            {/* ĐÃ SỬA: dùng forceDownloadUrl cho nút tải */}
+            <a href={forceDownloadUrl(file.fileUrl)} download={file.fileName} target="_blank" rel="noreferrer"
               className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-teal-500 hover:bg-teal-50 dark:hover:bg-teal-500/10 transition-colors"
               title="Tải xuống">
               <Download className="w-3.5 h-3.5" />

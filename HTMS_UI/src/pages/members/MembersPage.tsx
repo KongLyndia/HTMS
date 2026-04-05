@@ -473,7 +473,7 @@ function AddMemberModal({ projectId, onClose }: { projectId: string; onClose: ()
             {searching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 animate-spin" />}
             <input type="email" value={email} onChange={e => handleEmailChange(e.target.value)}
               placeholder="email@example.com"
-              className={cn("w-full pl-9 pr-9 py-2.5 text-sm rounded-xl #f0fdfadark:bg-white/[0.04] border text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 transition-all",
+              className={cn("w-full pl-9 pr-9 py-2.5 text-sm rounded-xl #f0fdfa dark:bg-white/[0.1] border text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 transition-all",
                 searchErr ? "border-rose-400 focus:ring-rose-400/20"
                 : found   ? "border-teal-400 focus:ring-teal-400/20"
                           : "border-slate-200 dark:border-white/[0.08] focus:border-teal-400 focus:ring-teal-400/20")} />

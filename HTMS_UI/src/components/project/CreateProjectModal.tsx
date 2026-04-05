@@ -357,7 +357,7 @@ export default function CreateProjectModal({ open, onClose }: Props) {
                                 <motion.div key={m.email} layout
                                   initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
                                   exit={{ opacity: 0, x: 20 }} transition={{ duration: 0.15 }}
-                                  className="flex items-center gap-2.5 px-3 py-2 rounded-xl #f0fdfadark:bg-white/[0.03] border border-slate-100 dark:border-white/[0.06]">
+                                  className="flex items-center gap-2.5 px-3 py-2 rounded-xl #f0fdfa dark:bg-white/[0.1] border border-slate-100 dark:border-white/[0.06]">
                                   <div className="w-6 h-6 rounded-full bg-gradient-to-br from-teal-400 to-teal-600 flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0">
                                     {m.email[0].toUpperCase()}
                                   </div>

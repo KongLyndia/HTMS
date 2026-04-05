@@ -1,13 +1,17 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
-  AlertCircle, ArrowRight, Calendar, CheckCircle2, CheckSquare,
+  AlertCircle, ArrowRight, Calendar, CheckCircle2,
   ChevronDown, ClipboardList, ExternalLink, Filter,
   Folders, ListTodo, Plus, SortAsc, User2, X,
+  Zap, Brain, TrendingUp, TrendingDown, Minus,
+  ChevronUp, Activity,
+  CheckSquare,
 } from "lucide-react";
-import { useMyTasks } from "../../hooks/useMyTasks";
-import type { AggregatedTask } from "../../api/myTasksApi";
+import { getDailyFocus, calcWorkloadScore, calcRiskScore, type FocusSummary, type ScoredTask } from "@/lib/taskPrioritizer";
+import { useMyTasks } from "@/hooks/useMyTasks";
+import type { AggregatedTask } from "@/api/myTasksApi";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const PRIORITY_ORDER: Record<string, number> = {
@@ -578,6 +582,187 @@ function Toast({ message, onDismiss }: { message: string; onDismiss: () => void 
   );
 }
 
+
+// ─── WorkloadBadge ────────────────────────────────────────────────────────────
+function WorkloadBadge({ score, riskScore }: { score: number; riskScore: number }) {
+  const level = score >= 80 ? "overloaded" : score >= 60 ? "high" : score >= 30 ? "medium" : "low";
+  const cfg = {
+    overloaded: { label: "Quá tải",    cls: "bg-rose-100 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400",    icon: TrendingUp   },
+    high:       { label: "Bận nhiều",  cls: "bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400", icon: TrendingUp   },
+    medium:     { label: "Bình thường",cls: "bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400",     icon: Minus        },
+    low:        { label: "Nhẹ nhàng",  cls: "bg-teal-100 text-teal-600 dark:bg-teal-500/20 dark:text-teal-400",     icon: TrendingDown },
+  }[level];
+  const Icon = cfg.icon;
+  return (
+    <div className="flex items-center gap-3 flex-wrap">
+      <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${cfg.cls}`}>
+        <Icon size={11} />
+        <span>Workload {score}%</span>
+      </div>
+      {riskScore > 0 && (
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold
+          bg-rose-100 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400">
+          <Activity size={11} />
+          <span>Risk {riskScore}%</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── DailyFocus Section ───────────────────────────────────────────────────────
+function DailyFocus({ tasks, onOpenDrawer }: {
+  tasks:       import("@/api/myTasksApi").AggregatedTask[];
+  onOpenDrawer:(t: import("@/api/myTasksApi").AggregatedTask) => void;
+}) {
+  const [expanded, setExpanded] = React.useState(true);
+  const activeTasks = tasks.filter(t => !t.isCompleted);
+  if (activeTasks.length === 0) return null;
+
+  const focus = getDailyFocus(activeTasks);
+  if (focus.focusTasks.length === 0) return null;
+
+  const levelColor = {
+    overloaded: "border-rose-300 dark:border-rose-700/50   bg-rose-50/60   dark:bg-rose-900/10",
+    high:       "border-amber-300 dark:border-amber-700/50  bg-amber-50/60  dark:bg-amber-900/10",
+    medium:     "border-blue-300 dark:border-blue-700/50    bg-blue-50/60   dark:bg-blue-900/10",
+    low:        "border-teal-300 dark:border-teal-700/50    bg-teal-50/60   dark:bg-teal-900/10",
+  }[focus.workloadLevel];
+
+  const priorityDot: Record<string, string> = {
+    Urgent: "bg-red-500", High: "bg-orange-500", Medium: "bg-yellow-500", Low: "bg-sky-500",
+  };
+  const statusDot: Record<string, string> = {
+    "Todo": "bg-slate-400", "In Progress": "bg-blue-500",
+    "Pending": "bg-amber-500", "Rejected": "bg-red-500",
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={`rounded-2xl border-2 ${levelColor} mb-6 overflow-hidden`}
+    >
+      {/* Header */}
+      <button
+        onClick={() => setExpanded(v => !v)}
+        className="w-full flex items-center justify-between px-4 py-3.5">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-teal-500 to-teal-600
+            flex items-center justify-center flex-shrink-0 shadow-sm">
+            <Brain size={14} className="text-white" />
+          </div>
+          <div className="text-left">
+            <p className="text-sm font-bold text-slate-800 dark:text-white leading-tight">
+              Focus hôm nay
+            </p>
+            <p className="text-[10px] text-slate-400 mt-0.5">
+              {focus.focusTasks.length} task quan trọng nhất
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <WorkloadBadge score={focus.workloadScore} riskScore={focus.riskScore} />
+          {expanded
+            ? <ChevronUp size={14} className="text-slate-400 flex-shrink-0" />
+            : <ChevronDown size={14} className="text-slate-400 flex-shrink-0" />}
+        </div>
+      </button>
+
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden">
+
+            {/* AI Suggestion */}
+            <div className="mx-4 mb-3 px-3.5 py-2.5 rounded-xl
+              bg-white/70 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/40">
+              <div className="flex items-start gap-2">
+                <Zap size={13} className="text-teal-500 mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                  {focus.suggestion}
+                </p>
+              </div>
+            </div>
+
+            {/* Task list */}
+            <div className="px-4 pb-4 space-y-2">
+              {focus.focusTasks.map((scored, i) => {
+                const t = scored.task;
+                const isOverdueTask = scored.deadlineDays !== null && scored.deadlineDays < 0;
+                const isTodayTask   = scored.deadlineDays === 0;
+                return (
+                  <motion.button
+                    key={t.id}
+                    onClick={() => onOpenDrawer(t)}
+                    initial={{ opacity: 0, x: -8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                    className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-left
+                      bg-white dark:bg-slate-800/60
+                      border border-slate-200/70 dark:border-slate-700/40
+                      hover:border-teal-300 dark:hover:border-teal-700/50
+                      hover:shadow-sm transition-all duration-150 group">
+
+                    {/* Score badge */}
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center
+                      flex-shrink-0 text-xs font-bold
+                      ${scored.score >= 80 ? "bg-rose-100 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400"
+                        : scored.score >= 60 ? "bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400"
+                        : "bg-teal-100 text-teal-600 dark:bg-teal-500/20 dark:text-teal-400"}`}>
+                      {scored.score}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <span className="text-[10px] font-bold text-slate-400">#{i + 1}</span>
+                        {t.priority && (
+                          <span className={`w-1.5 h-1.5 rounded-full ${priorityDot[t.priority] ?? "bg-slate-400"}`} />
+                        )}
+                        {t.taskStatus && (
+                          <span className={`w-1.5 h-1.5 rounded-full ${statusDot[t.taskStatus] ?? "bg-slate-400"}`} />
+                        )}
+                      </div>
+                      <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate">
+                        {t.title}
+                      </p>
+                      {/* Reasons */}
+                      {scored.reasons.length > 0 && (
+                        <p className="text-[10px] text-slate-400 mt-0.5 truncate">
+                          {scored.reasons[0]}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Deadline chip */}
+                    {scored.deadlineDays !== null && (
+                      <div className={`flex-shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold
+                        ${isOverdueTask ? "bg-rose-100 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400"
+                          : isTodayTask  ? "bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400"
+                          : "bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400"}`}>
+                        {isOverdueTask ? `+${Math.abs(scored.deadlineDays)}d`
+                         : isTodayTask  ? "Hôm nay"
+                         : `${scored.deadlineDays}d`}
+                      </div>
+                    )}
+
+                    <ArrowRight size={13} className="text-slate-300 group-hover:text-teal-500
+                      flex-shrink-0 transition-colors" />
+                  </motion.button>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function MyTasksPage() {
   const { tasks, isLoading, completePersonal, createPersonal, isCreating } = useMyTasks();
@@ -606,7 +791,7 @@ export default function MyTasksPage() {
     if (filter === "done")     return t.isCompleted === true;
     if (filter === "personal") return t.type === "personal" && !t.isCompleted;
     if (filter === "project")  return t.type === "project"  && !t.isCompleted;
-    return !t.isCompleted; // "all" chỉ hiện chưa hoàn thành
+    return !t.isCompleted;
   });
 
   const sorted = [...filtered].sort((a, b) => {
@@ -630,10 +815,10 @@ export default function MyTasksPage() {
   const overdueCount = tasks.filter((t) => isOverdue(t.dueDate)).length;
 
   const tabs: { key: FilterType; label: string; icon: React.ReactNode }[] = [
-    { key: "all",      label: "Tất cả",        icon: <ListTodo    size={13} /> },
-    { key: "personal", label: "Cá nhân",        icon: <User2       size={13} /> },
-    { key: "project",  label: "Dự án",          icon: <Folders     size={13} /> },
-    { key: "done",     label: "Đã hoàn thành",  icon: <CheckSquare size={13} /> },
+    { key: "all",      label: "Tất cả",       icon: <ListTodo    size={13} /> },
+    { key: "personal", label: "Cá nhân",       icon: <User2       size={13} /> },
+    { key: "project",  label: "Dự án",         icon: <Folders     size={13} /> },
+    { key: "done",     label: "Hoàn thành",    icon: <CheckSquare size={13} /> },
   ];
 
   return (
@@ -693,6 +878,11 @@ export default function MyTasksPage() {
             )}
           </p>
         </motion.div>
+
+        {/* Daily Focus — hiện khi ở tab "all" */}
+        {filter === "all" && !isLoading && (
+          <DailyFocus tasks={tasks} onOpenDrawer={setDrawerTask} />
+        )}
 
         {/* Toolbar */}
         <div className="flex items-center justify-between gap-3 mb-5">
@@ -813,7 +1003,7 @@ export default function MyTasksPage() {
               Không có công việc nào
             </p>
             <p className="text-xs text-slate-400 dark:text-slate-600">
-              {filter !== "all" ? "Thử chọn tab khác hoặc xem Tất cả" : "Bạn đang rảnh rỗi! 🎉"}
+              {filter !== "all" ? "Thử chọn tab khác hoặc xem Tất cả" : "Bạn đang rảnh rỗi!"}
             </p>
           </motion.div>
         ) : (

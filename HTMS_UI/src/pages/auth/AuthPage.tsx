@@ -244,7 +244,7 @@ export default function AuthPage() {
             <CheckSquare className="w-4 h-4 text-white" />
           </div>
           <span className="font-bold text-lg" style={{ color: isDark ? "#fff" : "#0f4f48" }}>
-            Task<span className="text-teal-600">Flow</span>
+            Nex<span className="text-teal-600">Us</span>
           </span>
         </div>
 
