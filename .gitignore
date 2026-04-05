@@ -1,12 +1,3 @@
-# ==========================================
-#   .gitignore cho ASP.NET API C# + React.js
-# ==========================================
-
-
-# ------------------------------------------
-# ASP.NET / C# / .NET
-# ------------------------------------------
-
 # Build output
 bin/
 obj/
@@ -47,7 +38,7 @@ artifacts/
 *.coverage
 TestResults/
 
-# Environment & secrets (RẤT QUAN TRỌNG - không bao giờ push lên git)
+# Environment & secrets
 appsettings.Development.json
 appsettings.Production.json
 appsettings.Local.json
@@ -57,7 +48,7 @@ secrets.json
 .env
 .env.*
 
-# Entity Framework migrations snapshot (tuỳ chọn - có thể giữ lại)
+# Entity Framework migrations snapshot 
 # Migrations/
 
 # App data
@@ -81,7 +72,7 @@ node_modules/
 /build
 /dist
 
-# Environment variables (KHÔNG push lên git)
+# Environment variables 
 .env
 .env.local
 .env.development.local
@@ -113,19 +104,12 @@ Thumbs.db
 *.pem
 
 
-# ------------------------------------------
-# Docker (nếu dùng)
-# ------------------------------------------
-
-# Không ignore Dockerfile và docker-compose.yml vì cần commit
+# Không ignore Dockerfile và docker-compose.yml 
 # Chỉ ignore file override local
 docker-compose.override.yml
 docker-compose.local.yml
 
 
-# ------------------------------------------
-# Hệ điều hành
-# ------------------------------------------
 
 # Windows
 Thumbs.db
